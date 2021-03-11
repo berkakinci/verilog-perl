@@ -1,0 +1,210 @@
+#!/usr/bin/perl -w
+# See copyright, etc in below POD section.
+######################################################################
+
+use lib 'blib/lib';
+use Verilog::EditFiles;
+use FindBin qw($RealBin $RealScript $Script);
+
+use Getopt::Long;
+use File::Basename 'fileparse';
+use File::Path 'make_path';
+use Pod::Usage;
+
+use strict;
+
+our $VERSION = '3.475';
+
+######################################################################
+# main
+
+# capitalized are globals
+our $Debug = 0;
+my $output_dir = "./gen/";
+my $verbose = 0;
+our @Files = ();
+
+if (! GetOptions (
+	  "help"	=> \&usage,
+	  "debug"	=> \&debug,
+	  "version"	=> \&version,
+	  "o=s"		=> \$output_dir,
+	  "verbose"     => \$verbose,
+	  "<>"		=> \&parameter,
+    )) {
+    die "%Error: Bad usage, try '$0 --help'\n";
+}
+
+if ($output_dir ne ""
+    && $output_dir !~ /[\/\\]$/) {
+    $output_dir .= "/";
+}
+
+if (!@Files) { &usage(); }
+
+my @suffixes = ('.sv', '.v', '.h', '.tb');
+my @queue = ();
+# Checks before we make any changes.
+foreach my $file (@Files) {
+    my ($name, $path, $suffix) = fileparse($file, @suffixes);
+    my $output_path = $output_dir . $name;
+
+    die "%Error: Refusing to clobber existing directory $output_path."
+	if (-d $output_path);
+
+    my %entry = ( 'in_file'    => $file,
+		  'out_path'   => $output_path,
+		  'out_suffix' => $suffix,
+	);
+
+    push @queue, \%entry;
+}
+
+# Produce the output.
+while( my $entry_ref = (shift @queue) ) {
+    my %entry = %{$entry_ref};
+
+    make_path $entry{'out_path'}
+        or die "%Error: Can't create path $entry{'out_path'}"; # make_path dies anyway...
+
+    print( "%Info: Working on ".$entry{'in_file'}."; output to ".$entry{'out_path'}."; using suffix ".$entry{'out_suffix'}."\n" );
+
+    # Create a split object
+    my $splitter = Verilog::EditFiles->new
+	(# Verilog::EditFiles will use the below program name in its comments
+	 program => $Script,
+
+	 # Name of the directory to write the output modules to.
+	 # I like to put all generated files under a dir named "gen"
+	 # so it is obvious the files are generated.
+	 outdir => $entry{'out_path'},
+
+	 # If true, add "`celldefine" before every module statement.
+	 #celldefine => 1,
+
+	 # For the write_lint method, the name of the linter to use.
+	 lint_command => 'verilator --lint-only --Wall',
+
+	 # If defined, add the provided text before every module statement.
+	 # Generally used to insert lint off pragmas.
+	 #lint_header => "// lint_checking MY_RULES OFF\n",
+
+	 # If defined, add the provided text before every module statement.
+	 # Generally used to insert lint off pragmas.
+	 #include_header => "`include \"my_defines.v\"\n",
+
+	 # If defined, add the provided text before every module statement.
+	 # Generally used to insert lint off pragmas.
+	 #timescale_header => "`include \"my_timescale.v\"\n",
+
+	 # If set, remove any `timescales.
+	 #timescale_removal => 1,
+
+	 # If 1, replace any synopsys translate on/offs with "`ifdef SYNTHESIS" and
+	 # "`endif"s.  If set to a string, use that string instead of "SYNTHESIS".
+	 translate_synthesis => 'SYNTHESIS',
+
+	 # The suffix to add to convert a module name into a filename.  Defaults to
+	 v_suffix => $entry{'out_suffix'},
+
+	 # If set, show what files are being read and written
+	 verbose => $verbose,
+	);
+
+    # Read specified libraries and split them
+    $splitter->read_and_split($entry{'in_file'});
+
+    # And write them out
+    $splitter->write_files();
+
+    # And create a lint file
+    $splitter->write_lint();
+}
+
+exit(0);
+
+######################################################################
+
+sub nop{}
+
+sub usage {
+    print "Version: $VERSION\n";
+    pod2usage(-verbose=>2, -exitval=>2, -output=>\*STDOUT, -noperldoc=>1);
+    exit(1);
+}
+
+sub debug {
+    $Debug = 1;
+    $Verilog::EditFiles::Debug = $Debug;
+}
+
+sub version {
+    print "Version $VERSION\n";
+    exit(0);
+}
+
+sub parameter {
+    my $param = shift;
+    push @Files, "$param"; # Must quote to convert Getopt to string, bug298
+    (-r $param) or die "%Error: Can't open $param";
+}
+
+######################################################################
+######################################################################
+
+__END__
+=pod
+
+=head1 NAME
+
+vsplitmod - Split single-file collection of modules into individual Verilog files.
+
+=head1 SYNOPSIS
+
+  vsplitmod <filename> ...
+
+=head1 DESCRIPTION
+
+Vsplitmod reads a Verilog file that contains multiple modules.  It will create
+a new directory and fill it with one-module-per-file Verilog files.
+
+=head1 ARGUMENTS
+
+vsplitmod takes the following arguments:
+
+=over 4
+
+=item --help
+
+Displays this message and program version and exits.
+
+=item --version
+
+Displays program version and exits.
+
+=item --o {dir}
+
+Directory to put the new files.  Defaults to ./gen
+
+=back
+
+=head1 DISTRIBUTION
+
+Verilog-Perl is part of the L<https://www.veripool.org/> free Verilog EDA
+software tool suite.  The latest version is available from CPAN and from
+L<https://www.veripool.org/verilog-perl>.
+
+Copyright 2000-2021 by Wilson Snyder.  This package is free software; you
+can redistribute it and/or modify it under the terms of either the GNU
+Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
+
+=head1 AUTHORS
+
+Wilson Snyder <wsnyder@wsnyder.org>
+Berk Akinci <berka@alum.wpi.edu>
+
+=head1 SEE ALSO
+
+L<Verilog-Perl>, L<Verilog::Parser>
+
+=cut

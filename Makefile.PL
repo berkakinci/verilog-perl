@@ -131,7 +131,7 @@ WriteMakefile(
 		  #'Test::Perl::Critic' => 1,  # Required only for author tests
 	      },
 	      PMLIBDIRS => ['lib', 'Parser', 'Preproc', 'Netlist',],
-	      EXE_FILES => [qw( vrename vpassert vppreproc vhier vsplitmodule )],
+	      EXE_FILES => [qw( vrename vpassert vppreproc vhier vsplitmodule vsplitmod )],
 	      'clean'	=> {FILES => qw (test_dir signals.vrename .vpassert simv ),},
 	      'dist'    => {COMPRESS => 'gzip -9f',
 			    SUFFIX   => '.gz',
