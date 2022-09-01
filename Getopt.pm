@@ -16,7 +16,7 @@ use Cwd;
 ######################################################################
 #### Configuration Section
 
-$VERSION = '3.475';
+$VERSION = '3.479';
 
 # Basenames we should ignore when recursing directories,
 # Because they contain large files of no relevance
@@ -386,12 +386,13 @@ sub file_substitute {
     my $self = shift;
     my $filename = shift;
     my $out = $filename;
-    while ($filename =~ /\$([A-Za-z_0-9]+)\b/g
-           || $filename =~ /\$\{[A-Za-z_0-9]+\}\b/g) {
+    while ($filename =~ /\$([A-Za-z_0-9]+)\b/g) {
 	my $var = $1;
-	if (defined $ENV{$var}) {
-	    $out =~ s/\$$var\b/$ENV{$var}/g;
-	}
+	$out =~ s/\$$var\b/$ENV{$var}/g if defined $ENV{$var};
+    }
+    while ($filename =~ /\$\{([A-Za-z_0-9]+)\}/g) {
+	my $var = $1;
+	$out =~ s/\$\{$var\}/$ENV{$var}/g if defined $ENV{$var};
     }
     $out =~ s!^~!$ENV{HOME}/!;
     return $out;
@@ -813,7 +814,7 @@ Verilog-Perl is part of the L<https://www.veripool.org/> free Verilog EDA
 software tool suite.  The latest version is available from CPAN and from
 L<https://www.veripool.org/verilog-perl>.
 
-Copyright 2000-2020 by Wilson Snyder.  This package is free software; you
+Copyright 2000-2021 by Wilson Snyder.  This package is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License Version 3 or the Perl Artistic License Version 2.0.
 
